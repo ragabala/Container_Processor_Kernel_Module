@@ -1,5 +1,8 @@
 # CSC 501 Project 1: Process Container
 
+## Team Members
+* Krithika Sekhar (ksekhar@ncsu.edu)
+* Ragavendran Balakrishnan (rbalakr2@ncsu.edu)
 ## Overview
 Modern operating systems promote virtualization of their underlying machines and isolation using process/thread abstractions. As a result, threads/processes also become the identities of resource scheduling for tasks in the system. However, the "matching" between abstraction and resource allocation also creates "mismatching" between tasks and their real demands of resources. For example, process scheduling is based on the CPU time, regardless their I/O usages. The system also lacks flexibilities in controlling the usage of system resources for threads/processes with different properties as they are all treated the same.
 
