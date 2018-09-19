@@ -53,6 +53,7 @@
  */
 int processor_container_delete(struct processor_container_cmd __user *user_cmd)
 {
+    printk(KERN_INFO "deleting container\n");
     return 0;
 }
 
@@ -66,6 +67,9 @@ int processor_container_delete(struct processor_container_cmd __user *user_cmd)
  */
 int processor_container_create(struct processor_container_cmd __user *user_cmd)
 {
+
+    printk(KERN_INFO "Hello world 1.\n");
+    printk(KERN_INFO "creating container\n");
     return 0;
 }
 
@@ -77,6 +81,7 @@ int processor_container_create(struct processor_container_cmd __user *user_cmd)
  */
 int processor_container_switch(struct processor_container_cmd __user *user_cmd)
 {
+    printk(KERN_INFO "switching container\n");
     return 0;
 }
 
@@ -87,6 +92,7 @@ int processor_container_switch(struct processor_container_cmd __user *user_cmd)
 int processor_container_ioctl(struct file *filp, unsigned int cmd,
                               unsigned long arg)
 {
+    printk(KERN_INFO "Selecting ioctl\n");
     switch (cmd)
     {
     case PCONTAINER_IOCTL_CSWITCH:
