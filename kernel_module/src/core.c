@@ -46,16 +46,38 @@
 
 extern struct miscdevice processor_container_dev;
 
+ struct Thread_list
+ {
+    struct list_head list;
+ };
+
+struct Container_list
+{
+    __u64 cid;
+    struct Thread_list *head;
+    struct list_head list;
+};
+
+
+// initializing the pointers 
+
+struct Container_list container_head;
+struct mutex list_lock;  
+
 /**
  * Initialize and register the kernel module
  */
 int processor_container_init(void)
 {
+
     int ret;
     if ((ret = misc_register(&processor_container_dev)))
         printk(KERN_ERR "Unable to register \"processor_container\" misc device\n");
     else
+    {
+    	INIT_LIST_HEAD(&container_head.list);
         printk(KERN_ERR "\"processor_container\" misc device installed\n");
+    }
     return ret;
 }
 
