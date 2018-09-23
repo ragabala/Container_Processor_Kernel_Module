@@ -142,7 +142,7 @@ int processor_container_switch(struct processor_container_cmd __user *user_cmd)
 {
     //struct task_struct *current;
 
-    printk(KERN_INFO "switching container\n");
+    
     // https://www.linuxjournal.com/article/8144
     // mutex_lock()
     // sleeping_task = current;
