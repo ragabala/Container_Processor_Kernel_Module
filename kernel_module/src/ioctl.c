@@ -93,6 +93,7 @@ struct Container_list *create_container(__u64 cid){
         memset(temp, 0, sizeof(struct Container_list));
         mutex_init(&list_lock);
         temp->cid = cid;
+        INIT_LIST_HEAD(&temp->thread_head.list);
         mutex_lock(&list_lock);
         list_add(&(temp->list), &(container_head.list));
         mutex_unlock(&list_lock);
@@ -156,6 +157,8 @@ int processor_container_create(struct processor_container_cmd __user *user_cmd)
     copy_from_user(&kernel_cmd, (void __user *) user_cmd, sizeof(struct processor_container_cmd));
     struct Container_list *container =  NULL;
     container = create_container(kernel_cmd.cid);
+    struct Thread_list *thread =  NULL;
+    thread = create_thread(container);
     printk(KERN_INFO "Hello world 1.\n");
     printk(KERN_INFO "creating container\n");
     return 0;
