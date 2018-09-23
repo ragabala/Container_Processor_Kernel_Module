@@ -48,13 +48,14 @@ extern struct miscdevice processor_container_dev;
 
  struct Thread_list
  {
+ 	struct task_struct *data;
     struct list_head list;
  };
 
 struct Container_list
 {
     __u64 cid;
-    struct Thread_list *head;
+    struct Thread_list thread_head;
     struct list_head list;
 };
 

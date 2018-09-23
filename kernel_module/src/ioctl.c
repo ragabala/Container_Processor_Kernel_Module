@@ -50,13 +50,14 @@
  
  struct Thread_list
  {
+    struct task_struct *data;
     struct list_head list;
  };
 
 struct Container_list
 {
     __u64 cid;
-    struct Thread_list *head;
+    struct Thread_list thread_head;
     struct list_head list;
 };
 
@@ -97,6 +98,34 @@ struct Container_list *create_container(__u64 cid){
         mutex_unlock(&list_lock);
     }
     return temp;
+}
+
+// Thread creation logic
+struct Thread_list *get_thread(struct Container_list* container, pid_t tid){
+    struct Thread_list *temp;
+    struct list_head *pos, *q;   
+    list_for_each_safe(pos, q, &((container->thread_head).list)) {
+        temp = list_entry(pos, struct Thread_list, list);
+        if( tid == temp->data->pid) {
+            return temp;
+        }
+    }
+    return NULL;
+}
+struct Thread_list *create_thread(struct Container_list* container){
+    struct Thread_list *temp = get_thread(container, current->pid);
+    if(temp == NULL)
+    {
+        printk("Creating a new thread with Tid: %d\n", current->pid);
+        temp = (struct Thread_list*)kmalloc(sizeof(struct Thread_list),GFP_KERNEL);
+        memset(temp, 0, sizeof(struct Thread_list));
+        mutex_init(&list_lock);
+        temp->data = current;
+        mutex_lock(&list_lock);
+        list_add(&(temp->list), &((container->thread_head).list));
+        mutex_unlock(&list_lock);
+    }
+    return temp;    
 }
 
 
