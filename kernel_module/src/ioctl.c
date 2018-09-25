@@ -88,7 +88,7 @@ struct Container_list *create_container(__u64 cid){
     struct Container_list *temp = get_container(cid);
     if(temp == NULL )
     {
-        printk("Creating a new container with Cid: %llu\n", cid);
+        //printk("Creating a new container with Cid: %llu\n", cid);
         temp = (struct Container_list*)kmalloc(sizeof(struct Container_list),GFP_KERNEL);
         memset(temp, 0, sizeof(struct Container_list));
         mutex_init(&list_lock);
@@ -117,7 +117,7 @@ struct Thread_list *create_thread(struct Container_list* container){
     struct Thread_list *temp = get_thread(container, current->pid);
     if(temp == NULL)
     {
-        printk("Creating a new thread with Tid: %d\n", current->pid);
+        //printk("Creating a new thread with Tid: %d\n", current->pid);
         temp = (struct Thread_list*)kmalloc(sizeof(struct Thread_list),GFP_KERNEL);
         memset(temp, 0, sizeof(struct Thread_list));
         mutex_init(&list_lock);
@@ -130,6 +130,105 @@ struct Thread_list *create_thread(struct Container_list* container){
 }
 
 
+/*
+* Check whether any other thread is active other than the current thread
+* Will return the active thread other than the current pointer.
+*/
+struct Thread_list *get_active_thread(struct Container_list* container, pid_t tid){
+    struct list_head *pos, *q;   
+    struct Thread_list *temp;
+    list_for_each_safe(pos, q, &((container->thread_head).list)) {
+        temp = list_entry(pos, struct Thread_list, list);
+        if ( tid != temp->data->pid) {
+            if (temp->data->state == TASK_RUNNING){
+                return temp;
+            }
+        }
+    }
+    return NULL;
+}
+
+void set_thread_state(struct Container_list* container){
+    struct Thread_list* other_active_thread = get_active_thread(container, current->pid);
+    if(other_active_thread == NULL)
+    {
+        set_current_state(TASK_RUNNING);
+    }
+    else
+    {
+        set_current_state(TASK_INTERRUPTIBLE);   
+    }
+    schedule();
+}
+
+// Function to get the next sleeping thread after the currently running thread
+struct Thread_list *get_next_thread(struct task_struct* thread){
+    struct Container_list *temp;
+    struct list_head *pos, *q, *pos1, *q1;
+    struct Thread_list *temp_thread;   
+    list_for_each_safe(pos, q, &container_head.list) {
+        temp = list_entry(pos, struct Container_list, list);
+        list_for_each_safe(pos1, q1, &((temp->thread_head).list)) {
+            temp_thread = list_entry(pos1, struct Thread_list, list);
+            ////printk("temp PID: %d\n", temp_thread->data->pid);
+            ////printk("current thread PID: %d\n", thread->pid);   
+            if( thread->pid == temp_thread->data->pid) {
+                // return the first entry if the current thread is the last one.
+                if (list_is_last(pos1,&temp->thread_head.list))
+                {
+                    return list_first_entry(&temp->thread_head.list, struct Thread_list, list) ;
+                }
+
+                return list_entry(pos1->next, struct Thread_list, list);
+            }
+        }
+    }
+    return NULL;
+}
+
+
+void delete_current_thread(struct Thread_list *current_thread, struct Thread_list *next_thread){
+    //printk("Deleting thread with TID: %d",current_thread->data->pid);
+
+    mutex_lock(&list_lock);
+    list_del(&(current_thread->list));
+    kfree(current_thread);
+    mutex_unlock(&list_lock);
+    //printk(KERN_INFO "deleted Thread ");
+}
+
+
+void delete_thread_and_container(__u64 cid, struct task_struct* thread){
+    struct Container_list *temp = get_container(cid);
+    struct Thread_list* pos = get_thread(temp, thread->pid);
+    struct Thread_list *next_thread = NULL;
+    struct Thread_list* thread_head = &(temp->thread_head);
+    next_thread = get_next_thread(thread);  
+    mutex_lock(&list_lock);
+    wake_up_process(next_thread->data);
+    mutex_unlock(&list_lock);
+    delete_current_thread(pos, next_thread);
+    // checking if the thread list is empty
+    if(list_empty(&thread_head->list))
+    {
+        //printk(KERN_INFO "Thread list empty\n");
+        mutex_lock(&list_lock);
+        //printk("Deleting container with CID: %llu\n", cid);
+        list_del(&temp->list);
+        kfree(temp);
+        mutex_unlock(&list_lock);
+        if(list_empty(&container_head.list))
+        {
+            //printk(KERN_INFO "Container list empty\n");
+            //kfree(&container_head);
+        }
+    }
+    //printk("outside delete container\n");
+    //printk("scheduling thread to be stopped\n");
+    schedule();
+}
+
+
 /**
  * Delete the task in the container.
  * 
@@ -138,9 +237,15 @@ struct Thread_list *create_thread(struct Container_list* container){
  */
 int processor_container_delete(struct processor_container_cmd __user *user_cmd)
 {
-    printk(KERN_INFO "deleting container\n");
+    struct processor_container_cmd kernel_cmd;
+    //printk(KERN_INFO "\n");
+    //struct task_struct* current;
+    copy_from_user(&kernel_cmd, (void __user *) user_cmd, sizeof(struct processor_container_cmd));
+    //printk(KERN_INFO "In pcontainer delete with cid : %llu \n", kernel_cmd.cid);
+    delete_thread_and_container(kernel_cmd.cid, current);
     return 0;
 }
+
 
 /**
  * Create a task in the corresponding container.
@@ -152,15 +257,13 @@ int processor_container_delete(struct processor_container_cmd __user *user_cmd)
  */
 int processor_container_create(struct processor_container_cmd __user *user_cmd)
 {
-    struct processor_container_cmd kernel_cmd;
-    //struct task_struct* current;
-    copy_from_user(&kernel_cmd, (void __user *) user_cmd, sizeof(struct processor_container_cmd));
     struct Container_list *container =  NULL;
-    container = create_container(kernel_cmd.cid);
     struct Thread_list *thread =  NULL;
+    struct processor_container_cmd kernel_cmd;
+    copy_from_user(&kernel_cmd, (void __user *) user_cmd, sizeof(struct processor_container_cmd));
+    container = create_container(kernel_cmd.cid);
     thread = create_thread(container);
-    printk(KERN_INFO "Hello world 1.\n");
-    printk(KERN_INFO "creating container\n");
+    set_thread_state(container);
     return 0;
 }
 
@@ -172,16 +275,14 @@ int processor_container_create(struct processor_container_cmd __user *user_cmd)
  */
 int processor_container_switch(struct processor_container_cmd __user *user_cmd)
 {
-    //struct task_struct *current;
-
-    
-    // https://www.linuxjournal.com/article/8144
-    // mutex_lock()
-    // sleeping_task = current;
-    // set_current_state(TASK_INTERRUPTIBLE);
-    // schedule();
-    // mutex_unlock();
-
+    struct Thread_list *next_thread = NULL;
+    next_thread = get_next_thread(current);  
+    printk(" %d --> %d\n", current->pid,next_thread->data->pid);
+    mutex_lock(&list_lock);
+    set_current_state(TASK_INTERRUPTIBLE);
+    wake_up_process(next_thread->data);
+    mutex_unlock(&list_lock);
+    schedule();
     return 0;
 }
 
