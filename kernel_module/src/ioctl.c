@@ -269,9 +269,16 @@ int processor_container_switch(struct processor_container_cmd __user *user_cmd)
 {
     struct Thread_list *next_thread = NULL;
     next_thread = get_next_thread(current);  
+    if(next_thread == NULL)
+    {
+        return 0;
+    }
     printk(" %d --> %d\n", current->pid,next_thread->data->pid);
-    set_current_state(TASK_INTERRUPTIBLE);
-    wake_up_process(next_thread->data);
+    if(next_thread !=NULL && next_thread->data->pid != current->pid)
+    {
+        set_current_state(TASK_INTERRUPTIBLE);
+        wake_up_process(next_thread->data);
+    }
     schedule();
     return 0;
 }
