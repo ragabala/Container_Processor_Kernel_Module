@@ -76,6 +76,7 @@ int processor_container_init(void)
         printk(KERN_ERR "Unable to register \"processor_container\" misc device\n");
     else
     {
+        mutex_init(&list_lock);
     	INIT_LIST_HEAD(&container_head.list);
         printk(KERN_ERR "\"processor_container\" misc device installed\n");
     }

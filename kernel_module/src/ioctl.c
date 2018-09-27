@@ -65,7 +65,7 @@ struct Container_list
 // initializing the pointers 
 
 extern struct Container_list container_head;
-extern struct mutex list_lock;
+extern struct mutex list_lock; 
 // the process container for the kernel space
 
 struct Container_list *get_container(__u64 cid){
@@ -91,7 +91,6 @@ struct Container_list *create_container(__u64 cid){
         //printk("Creating a new container with Cid: %llu\n", cid);
         temp = (struct Container_list*)kmalloc(sizeof(struct Container_list),GFP_KERNEL);
         memset(temp, 0, sizeof(struct Container_list));
-        mutex_init(&list_lock);
         temp->cid = cid;
         INIT_LIST_HEAD(&temp->thread_head.list);
         mutex_lock(&list_lock);
@@ -120,11 +119,8 @@ struct Thread_list *create_thread(struct Container_list* container){
         //printk("Creating a new thread with Tid: %d\n", current->pid);
         temp = (struct Thread_list*)kmalloc(sizeof(struct Thread_list),GFP_KERNEL);
         memset(temp, 0, sizeof(struct Thread_list));
-        mutex_init(&list_lock);
         temp->data = current;
-        mutex_lock(&list_lock);
         list_add(&(temp->list), &((container->thread_head).list));
-        mutex_unlock(&list_lock);
     }
     return temp;    
 }
@@ -187,15 +183,21 @@ struct Thread_list *get_next_thread(struct task_struct* thread){
 }
 
 
-void delete_current_thread(struct Thread_list *current_thread, struct Thread_list *next_thread){
+void delete_current_thread(struct Thread_list *current_thread){
     //printk("Deleting thread with TID: %d",current_thread->data->pid);
-
-    mutex_lock(&list_lock);
     list_del(&(current_thread->list));
     kfree(current_thread);
-    mutex_unlock(&list_lock);
     //printk(KERN_INFO "deleted Thread ");
 }
+
+void delete_current_container(struct Container_list *current_container){
+    //printk("Deleting thread with TID: %d",current_thread->data->pid);
+    mutex_lock(&list_lock);
+    list_del(&(current_container->list));
+    mutex_unlock(&list_lock);
+    kfree(current_container);
+}
+
 
 
 void delete_thread_and_container(__u64 cid, struct task_struct* thread){
@@ -204,24 +206,12 @@ void delete_thread_and_container(__u64 cid, struct task_struct* thread){
     struct Thread_list *next_thread = NULL;
     struct Thread_list* thread_head = &(temp->thread_head);
     next_thread = get_next_thread(thread);  
-    mutex_lock(&list_lock);
     wake_up_process(next_thread->data);
-    mutex_unlock(&list_lock);
-    delete_current_thread(pos, next_thread);
+    delete_current_thread(pos);
     // checking if the thread list is empty
     if(list_empty(&thread_head->list))
     {
-        //printk(KERN_INFO "Thread list empty\n");
-        mutex_lock(&list_lock);
-        //printk("Deleting container with CID: %llu\n", cid);
-        list_del(&temp->list);
-        kfree(temp);
-        mutex_unlock(&list_lock);
-        if(list_empty(&container_head.list))
-        {
-            //printk(KERN_INFO "Container list empty\n");
-            //kfree(&container_head);
-        }
+        delete_current_container(temp);
     }
     //printk("outside delete container\n");
     //printk("scheduling thread to be stopped\n");
@@ -278,10 +268,8 @@ int processor_container_switch(struct processor_container_cmd __user *user_cmd)
     struct Thread_list *next_thread = NULL;
     next_thread = get_next_thread(current);  
     printk(" %d --> %d\n", current->pid,next_thread->data->pid);
-    mutex_lock(&list_lock);
     set_current_state(TASK_INTERRUPTIBLE);
     wake_up_process(next_thread->data);
-    mutex_unlock(&list_lock);
     schedule();
     return 0;
 }
