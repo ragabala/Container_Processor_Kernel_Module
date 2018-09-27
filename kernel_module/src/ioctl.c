@@ -120,7 +120,9 @@ struct Thread_list *create_thread(struct Container_list* container){
         temp = (struct Thread_list*)kmalloc(sizeof(struct Thread_list),GFP_KERNEL);
         memset(temp, 0, sizeof(struct Thread_list));
         temp->data = current;
+        mutex_lock(&list_lock);
         list_add(&(temp->list), &((container->thread_head).list));
+        mutex_unlock(&list_lock);
     }
     return temp;    
 }
